@@ -9,13 +9,17 @@ A comprehensive, professional license authentication and management system built
 - **License Keys**: Generate, manage, and validate license keys
 - **Application Control**: Create and manage multiple applications
 - **Web Dashboard**: User-friendly web interface for management
-- **Admin Panel**: Administrative controls and monitoring
+- **Advanced Admin Panel**: Complete system administration and monitoring
 - **Multi-platform**: Supports various programming languages via API
 - **Real-time Validation**: Session-based authentication with expiry
 - **Comprehensive Logging**: Audit trails and error logging
 - **Blacklist System**: HWID, IP, and username blacklisting
 - **Webhook Support**: Real-time notifications and integrations
 - **File Distribution**: Secure file download system
+- **System Analytics**: Real-time statistics and activity monitoring
+- **User Administration**: Ban/unban users with detailed audit trails
+- **License Oversight**: System-wide license key management
+- **Application Lifecycle**: Complete app management across all users
 
 ## 📋 Requirements
 
@@ -64,6 +68,40 @@ cd LicenseCore
 - **Licenses**: Generate and manage license keys
 - **Users**: View and manage registered users
 - **Settings**: Configure application settings
+
+### Admin Panel
+The comprehensive admin dashboard provides system-wide management capabilities:
+
+#### Dashboard Overview
+- **System Statistics**: Real-time metrics for users, applications, licenses, and activity
+- **Recent Activity**: Latest applications, users, and license keys
+- **Quick Actions**: Direct access to management functions
+
+#### User Management
+- **User Overview**: Complete list of all registered users with detailed information
+- **User Statistics**: Applications owned, licenses created, end users managed
+- **Administrative Controls**: Ban/unban users with reason logging
+- **Status Monitoring**: Track active and banned user accounts
+
+#### Application Management
+- **Application Control**: View all applications across the system
+- **Create Applications**: Admin can create apps for any user
+- **Delete Applications**: Complete removal with all associated data cleanup
+- **Statistics Tracking**: Monitor active keys, users, and activity per application
+
+#### License Management
+- **License Oversight**: System-wide view of all license keys
+- **Key Statistics**: Active, inactive, expired, and valid license counts
+- **Administrative Actions**: Delete license keys when necessary
+- **Usage Tracking**: Monitor which users have utilized which keys
+
+#### System Logs & Analytics
+- **Activity Monitoring**: Comprehensive audit trails of all system actions
+- **Analytics Dashboard**: Most active users and applications
+- **Log Pagination**: Efficient browsing through large datasets
+- **Security Tracking**: IP address and access pattern monitoring
+
+**Access**: Navigate to `/admin/` after logging in to access the admin panel.
 
 ### API Integration
 
@@ -194,8 +232,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 - [Documentation](DOCUMENTATION.md)
-- [GitHub Issues](https://github.com/yourusername/LicenseCore/issues)
-- [Discord Community](https://discord.gg/licensecore)
+- [GitHub Issues](https://github.com/sharmaofficiall/LicenseCore/issues)
+- [Discord Community](https://discord.gg/phfhMqsBQF)
 
 ---
 
