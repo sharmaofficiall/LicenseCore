@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-[#09090d] text-white overflow-x-hidden">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LicenseAuth Pro - Professional License Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .gradient-text {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .glow {
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-[#09090d] via-[#1a1a2e] to-[#16213e]">
+    <!-- Navigation -->
+    <nav class="bg-[#0f0f17]/80 backdrop-blur border-b border-gray-700 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-key text-blue-500 text-2xl"></i>
+                    <span class="text-2xl font-bold gradient-text">LicenseAuth Pro</span>
+                </div>
+                <div class="flex items-center space-x-6">
+                    <a href="./login/" class="text-gray-300 hover:text-white transition">Login</a>
+                    <a href="./register/" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition font-medium">
+                        Register
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div class="text-center mb-16">
+            <h1 class="text-5xl md:text-7xl font-bold mb-6">
+                Professional <span class="gradient-text">License Management</span>
+            </h1>
+            <p class="text-xl text-gray-400 mb-8 max-w-3xl mx-auto">
+                A comprehensive, production-ready license authentication and key management system. 
+                Built with security, scalability, and ease-of-use in mind.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="./register/" class="px-8 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition transform hover:scale-105">
+                    Get Started
+                </a>
+                <a href="#features" class="px-8 py-3 border-2 border-blue-600 text-blue-400 hover:bg-blue-600/10 rounded-lg font-bold transition">
+                    Learn More
+                </a>
+            </div>
+        </div>
+
+        <!-- Features Grid -->
+        <div id="features" class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
+            <!-- Feature 1 -->
+            <div class="bg-[#0f0f17]/60 backdrop-blur border border-gray-700 rounded-xl p-8 hover:border-blue-500 transition glow">
+                <i class="fas fa-lock-open text-3xl text-blue-500 mb-4"></i>
+                <h3 class="text-2xl font-bold mb-3">License Management</h3>
+                <p class="text-gray-400">
+                    Generate, manage, and track license keys. Support for multiple formats with expiry tracking.
+                </p>
+            </div>
+
+            <!-- Feature 2 -->
+            <div class="bg-[#0f0f17]/60 backdrop-blur border border-gray-700 rounded-xl p-8 hover:border-blue-500 transition glow">
+                <i class="fas fa-shield-alt text-3xl text-green-500 mb-4"></i>
+                <h3 class="text-2xl font-bold mb-3">Enterprise Security</h3>
+                <p class="text-gray-400">
+                    Bcrypt hashing, AES-256 encryption, SQL injection prevention, and rate limiting built-in.
+                </p>
+            </div>
+
+            <!-- Feature 3 -->
+            <div class="bg-[#0f0f17]/60 backdrop-blur border border-gray-700 rounded-xl p-8 hover:border-blue-500 transition glow">
+                <i class="fas fa-api text-3xl text-purple-500 mb-4"></i>
+                <h3 class="text-2xl font-bold mb-3">Modern API</h3>
+                <p class="text-gray-400">
+                    RESTful API v1.2 with JSON responses, session tokens, and comprehensive error handling.
+                </p>
+            </div>
+
+            <!-- Feature 4 -->
+            <div class="bg-[#0f0f17]/60 backdrop-blur border border-gray-700 rounded-xl p-8 hover:border-blue-500 transition glow">
+                <i class="fas fa-users text-3xl text-cyan-500 mb-4"></i>
+                <h3 class="text-2xl font-bold mb-3">User Management</h3>
+                <p class="text-gray-400">
+                    Register, authenticate, and manage end-users with hardware binding and ban system.
+                </p>
+            </div>
+
+            <!-- Feature 5 -->
+            <div class="bg-[#0f0f17]/60 backdrop-blur border border-gray-700 rounded-xl p-8 hover:border-blue-500 transition glow">
+                <i class="fas fa-sliders-h text-3xl text-yellow-500 mb-4"></i>
+                <h3 class="text-2xl font-bold mb-3">Advanced Features</h3>
+                <p class="text-gray-400">
+                    Subscriptions, variables, webhooks, chat system, file management, and more.
+                </p>
+            </div>
+
+            <!-- Feature 6 -->
+            <div class="bg-[#0f0f17]/60 backdrop-blur border border-gray-700 rounded-xl p-8 hover:border-blue-500 transition glow">
+                <i class="fas fa-chart-line text-3xl text-orange-500 mb-4"></i>
+                <h3 class="text-2xl font-bold mb-3">Analytics</h3>
+                <p class="text-gray-400">
+                    Real-time statistics, audit logs, and comprehensive reporting for all activities.
+                </p>
+            </div>
+        </div>
+
+        <!-- Quick Start Section -->
+        <div class="bg-[#0f0f17]/60 backdrop-blur border border-gray-700 rounded-xl p-12 mb-20">
+            <h2 class="text-4xl font-bold mb-8">Get Started in 5 Minutes</h2>
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
+                <div class="text-center">
+                    <div class="bg-blue-600 rounded-full w-12 h-12 flex items-center justify-center text-xl font-bold mx-auto mb-4">1</div>
+                    <p class="text-sm text-gray-400"><strong>Register</strong><br>Create your account</p>
+                </div>
+                <div class="flex items-center justify-center text-gray-600 text-2xl">→</div>
+                <div class="text-center">
+                    <div class="bg-blue-600 rounded-full w-12 h-12 flex items-center justify-center text-xl font-bold mx-auto mb-4">2</div>
+                    <p class="text-sm text-gray-400"><strong>Create App</strong><br>Set up your app</p>
+                </div>
+                <div class="flex items-center justify-center text-gray-600 text-2xl">→</div>
+                <div class="text-center">
+                    <div class="bg-blue-600 rounded-full w-12 h-12 flex items-center justify-center text-xl font-bold mx-auto mb-4">3</div>
+                    <p class="text-sm text-gray-400"><strong>Generate Keys</strong><br>Create licenses</p>
+                </div>
+            </div>
+            <div class="mt-8 text-center">
+                <a href="./SETUP_GUIDE.md" class="inline-block px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition">
+                    View Full Setup Guide →
+                </a>
+            </div>
+        </div>
+
+        <!-- Tech Stack -->
+        <div class="bg-[#0f0f17]/60 backdrop-blur border border-gray-700 rounded-xl p-12 mb-20">
+            <h2 class="text-3xl font-bold mb-8">Built With Modern Technology</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+                <div class="text-center">
+                    <i class="fab fa-php text-4xl text-purple-500 mb-4"></i>
+                    <p class="font-semibold">PHP 7.4+</p>
+                </div>
+                <div class="text-center">
+                    <i class="fas fa-database text-4xl text-orange-500 mb-4"></i>
+                    <p class="font-semibold">MySQL 5.7+</p>
+                </div>
+                <div class="text-center">
+                    <i class="fab fa-js text-4xl text-yellow-500 mb-4"></i>
+                    <p class="font-semibold">JavaScript</p>
+                </div>
+                <div class="text-center">
+                    <i class="fab fa-tailwindcss text-4xl text-blue-500 mb-4"></i>
+                    <p class="font-semibold">Tailwind CSS</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Example -->
+        <div class="bg-[#0f0f17]/60 backdrop-blur border border-gray-700 rounded-xl p-12 mb-20">
+            <h2 class="text-3xl font-bold mb-6">Simple API Integration</h2>
+            <pre class="bg-[#09090d] p-6 rounded text-sm overflow-x-auto text-gray-300"><code>POST /api/v1.2.php HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+
+ownerid=YOUR_OWNERID&name=YourApp&secret=SECRET&version=1.0&action=init
+
+Response:
+{
+  "success": true,
+  "message": "Session initialized",
+  "data": {
+    "sessionid": "abc123...",
+    "enckey": "key123..."
+  }
+}</code></pre>
+            <div class="mt-6">
+                <a href="./API_DOCUMENTATION.md" class="text-blue-500 hover:text-blue-400 font-semibold">
+                    View Full API Documentation →
+                </a>
+            </div>
+        </div>
+
+        <!-- CTA Section -->
+        <div class="text-center mb-20">
+            <h2 class="text-4xl font-bold mb-6">Ready to secure your licenses?</h2>
+            <p class="text-xl text-gray-400 mb-8">Join thousands of developers who trust LicenseAuth Pro</p>
+            <a href="./register/" class="inline-block px-8 py-4 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold text-lg transition transform hover:scale-105">
+                Create Free Account
+            </a>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-[#0f0f17] border-t border-gray-700 py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                <div>
+                    <h3 class="text-lg font-bold mb-4">LicenseAuth Pro</h3>
+                    <p class="text-gray-400">Professional license management for your applications.</p>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold mb-4">Quick Links</h3>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="./login/" class="hover:text-white transition">Login</a></li>
+                        <li><a href="./register/" class="hover:text-white transition">Register</a></li>
+                        <li><a href="./SETUP_GUIDE.md" class="hover:text-white transition">Setup Guide</a></li>
+                        <li><a href="./API_DOCUMENTATION.md" class="hover:text-white transition">API Docs</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold mb-4">Resources</h3>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="./README_KEYAUTH.md" class="hover:text-white transition">Documentation</a></li>
+                        <li><a href="#" class="hover:text-white transition">GitHub</a></li>
+                        <li><a href="#" class="hover:text-white transition">Support</a></li>
+                        <li><a href="#" class="hover:text-white transition">Status</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-gray-700 pt-8 text-center text-gray-400">
+                <p>&copy; 2024 LicenseAuth Pro. All rights reserved.</p>
+                <p class="text-sm mt-2">Based on KeyAuth Architecture • API v1.2 • System v2.0</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
