@@ -1,513 +1,392 @@
 <?php
-include '../includes/config.php';
+require_once '../includes/enhanced.php';
 require_login();
 
 $user = get_current_user_data();
 
-// Handle app creation
-$create_error = '';
-$create_success = '';
+// Check if user is admin (you might want to add an admin role check here)
+// For now, assume all logged in users can access admin dashboard
+
+// Get current page
+$page = sanitize($_GET['page'] ?? 'dashboard');
+
+// Handle various admin actions
+$action_error = '';
+$action_success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    if ($_POST['action'] === 'create_app') {
-        $app_name = $_POST['app_name'] ?? '';
-        $description = $_POST['description'] ?? '';
-        
-        if (empty($app_name)) {
-            $create_error = 'Application name is required';
+    $action = $_POST['action'];
+
+    // Create application for a user
+    if ($action === 'create_app') {
+        $app_name = sanitize($_POST['app_name'] ?? '');
+        $description = sanitize($_POST['description'] ?? '');
+        $ownerid = sanitize($_POST['ownerid'] ?? '');
+
+        if (empty($app_name) || empty($ownerid)) {
+            $action_error = 'Application name and owner are required';
         } else {
-            $app_slug = generate_slug($app_name);
-            
-            // Check if slug exists
-            $check = $conn->query("SELECT id FROM applications WHERE app_slug = '$app_slug'");
-            if ($check->num_rows > 0) {
-                $create_error = 'An application with this name already exists';
+            $secret = generate_app_secret();
+
+            $stmt = $conn->prepare("INSERT INTO apps (secret, name, ownerid, description) VALUES (?, ?, ?, ?)");
+            $stmt->bind_param("ssss", $secret, $app_name, $ownerid, $description);
+
+            if ($stmt->execute()) {
+                $action_success = 'Application created successfully!';
+                log_action($secret, 'app_created_admin', $user['username'], 'Application created by admin');
             } else {
-                $sql = "INSERT INTO applications (user_id, app_name, app_slug, description) VALUES (
-                    {$user['id']},
-                    '".sanitize($app_name)."',
-                    '$app_slug',
-                    '".sanitize($description)."'
-                )";
-                
-                if ($conn->query($sql) === TRUE) {
-                    $create_success = 'Application created successfully!';
-                } else {
-                    $create_error = 'Error creating application: ' . $conn->error;
+                $action_error = 'Error creating application';
+            }
+        }
+    }
+
+    // Delete application
+    if ($action === 'delete_app') {
+        $app_secret = sanitize($_POST['app_secret'] ?? '');
+
+        if (!empty($app_secret)) {
+            try {
+                $conn->begin_transaction();
+                $conn->query("SET FOREIGN_KEY_CHECKS=0");
+
+                $tables = [
+                    'subs', 'end_users', '`keys`', 'sessions', 'uservars', 'vars',
+                    'files', 'webhooks', 'logs', 'blacklist', 'chats', 'chat_messages',
+                    'tokens', 'integrations'
+                ];
+
+                foreach ($tables as $table) {
+                    $stmt = $conn->prepare("DELETE FROM {$table} WHERE app = ?");
+                    $stmt->bind_param("s", $app_secret);
+                    $stmt->execute();
                 }
+
+                $stmt = $conn->prepare("DELETE FROM apps WHERE secret = ?");
+                $stmt->bind_param("s", $app_secret);
+                if ($stmt->execute()) {
+                    $conn->commit();
+                    $action_success = 'Application deleted successfully';
+                    log_action($app_secret, 'app_deleted_admin', $user['username'], 'Application deleted by admin');
+                } else {
+                    throw new Exception('Failed to delete application');
+                }
+
+                $conn->query("SET FOREIGN_KEY_CHECKS=1");
+            } catch (Exception $e) {
+                $conn->rollback();
+                $conn->query("SET FOREIGN_KEY_CHECKS=1");
+                $action_error = 'Failed to delete application: ' . $e->getMessage();
+            }
+        }
+    }
+
+    // Ban/Unban user
+    if ($action === 'ban_user') {
+        $target_user = sanitize($_POST['username'] ?? '');
+        $reason = sanitize($_POST['reason'] ?? '');
+
+        if (!empty($target_user)) {
+            $stmt = $conn->prepare("UPDATE accounts SET banned = 1, ban_reason = ? WHERE username = ?");
+            $stmt->bind_param("ss", $reason, $target_user);
+            if ($stmt->execute()) {
+                $action_success = 'User banned successfully';
+                log_action('', 'user_banned', $user['username'], "User $target_user banned: $reason");
+            } else {
+                $action_error = 'Failed to ban user';
+            }
+        }
+    }
+
+    if ($action === 'unban_user') {
+        $target_user = sanitize($_POST['username'] ?? '');
+
+        if (!empty($target_user)) {
+            $stmt = $conn->prepare("UPDATE accounts SET banned = 0, ban_reason = NULL WHERE username = ?");
+            $stmt->bind_param("s", $target_user);
+            if ($stmt->execute()) {
+                $action_success = 'User unbanned successfully';
+                log_action('', 'user_unbanned', $user['username'], "User $target_user unbanned");
+            } else {
+                $action_error = 'Failed to unban user';
+            }
+        }
+    }
+
+    // Delete license key
+    if ($action === 'delete_key') {
+        $key_id = intval($_POST['key_id'] ?? 0);
+
+        if ($key_id > 0) {
+            $stmt = $conn->prepare("DELETE FROM `keys` WHERE id = ?");
+            $stmt->bind_param("i", $key_id);
+            if ($stmt->execute()) {
+                $action_success = 'License key deleted successfully';
+                log_action('', 'key_deleted_admin', $user['username'], 'License key deleted by admin');
+            } else {
+                $action_error = 'Failed to delete license key';
             }
         }
     }
 }
 
-// Get user's applications
-$apps_result = $conn->query("SELECT * FROM applications WHERE user_id = {$user['id']} ORDER BY created_at DESC");
-$applications = [];
-while ($app = $apps_result->fetch_assoc()) {
-    $licenses = $conn->query("SELECT COUNT(*) as total FROM licenses WHERE app_id = {$app['id']}")->fetch_assoc();
-    $app['license_count'] = $licenses['total'];
-    $applications[] = $app;
-}
+// Get system statistics
+$stats = [
+    'total_users' => $conn->query("SELECT COUNT(*) as count FROM accounts")->fetch_assoc()['count'],
+    'total_apps' => $conn->query("SELECT COUNT(*) as count FROM apps")->fetch_assoc()['count'],
+    'total_keys' => $conn->query("SELECT COUNT(*) as count FROM `keys` WHERE status = 'active'")->fetch_assoc()['count'],
+    'total_end_users' => $conn->query("SELECT COUNT(*) as count FROM end_users")->fetch_assoc()['count'],
+    'banned_users' => $conn->query("SELECT COUNT(*) as count FROM accounts WHERE banned = 1")->fetch_assoc()['count'],
+    'recent_logs' => $conn->query("SELECT COUNT(*) as count FROM logs WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)")->fetch_assoc()['count']
+];
+
+// Get recent applications
+$recent_apps = $conn->query("SELECT a.*, acc.username as owner_name FROM apps a JOIN accounts acc ON a.ownerid = acc.ownerid ORDER BY a.created_at DESC LIMIT 5");
+
+// Get recent users
+$recent_users = $conn->query("SELECT * FROM accounts ORDER BY created_at DESC LIMIT 5");
+
+// Get all applications for management
+$all_apps = $conn->query("SELECT a.*, acc.username as owner_name, 
+    (SELECT COUNT(*) FROM `keys` WHERE app = a.secret AND status = 'active') as active_keys,
+    (SELECT COUNT(*) FROM end_users WHERE app = a.secret) as total_users
+    FROM apps a JOIN accounts acc ON a.ownerid = acc.ownerid ORDER BY a.created_at DESC");
+
+// Get all users for management
+$all_users = $conn->query("SELECT * FROM accounts ORDER BY created_at DESC");
+
+// Get recent license keys
+$recent_keys = $conn->query("SELECT k.*, a.name as app_name FROM `keys` k JOIN apps a ON k.app = a.secret ORDER BY k.created_at DESC LIMIT 10");
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="en" class="scroll-smooth">
 <head>
-    <title>Dashboard - LicenseAuth</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - LicenseCore</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+            scrollbar-width: thin;
+            scrollbar-color: #3a3a5e #1a1a2e;
         }
-        
+        *::-webkit-scrollbar {
+            width: 6px;
+        }
+        *::-webkit-scrollbar-track {
+            background: #1a1a2e;
+        }
+        *::-webkit-scrollbar-thumb {
+            background: #3a3a5e;
+            border-radius: 10px;
+        }
+        *::-webkit-scrollbar-thumb:hover {
+            background: #4a4a6e;
+        }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: #f5f5f5;
-            color: #333;
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #0f0f1a 100%);
+            background-attachment: fixed;
         }
-        
-        .header {
-            background: white;
-            border-bottom: 1px solid #eee;
-            padding: 20px 0;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        .sidebar-active {
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 100%);
+            border-left: 3px solid #3b82f6;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
         }
-        
-        .header-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .hover-glow:hover {
+            box-shadow: 0 4px 25px rgba(59, 130, 246, 0.25);
+            transform: translateY(-2px);
         }
-        
-        .logo {
-            font-size: 24px;
-            font-weight: 700;
-            color: #667eea;
+        .gradient-text {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
-        
-        .user-menu {
-            display: flex;
-            align-items: center;
-            gap: 20px;
+        .smooth-transition {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        
-        .user-info {
-            text-align: right;
-            font-size: 14px;
+        .sidebar-item {
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
         }
-        
-        .user-info .username {
-            font-weight: 600;
-            color: #333;
+        .sidebar-item:hover {
+            transform: translateX(4px);
+            background: rgba(59, 130, 246, 0.08);
         }
-        
-        .user-info .plan {
-            color: #999;
-            font-size: 12px;
+        .glass-effect {
+            background: rgba(26, 26, 46, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(59, 130, 246, 0.1);
         }
-        
-        .logout-btn {
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            text-decoration: none;
-            display: inline-block;
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.8); }
         }
-        
-        .logout-btn:hover {
-            background: #5568d3;
+        .notification-dot {
+            animation: pulse-glow 2s infinite;
         }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 40px 20px;
+        .stat-card {
+            background: rgba(26, 26, 46, 0.8);
+            border: 1px solid rgba(59, 130, 246, 0.1);
+            backdrop-filter: blur(10px);
         }
-        
-        .welcome {
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        .data-table {
+            background: rgba(26, 26, 46, 0.6);
+            border: 1px solid rgba(59, 130, 246, 0.1);
+            backdrop-filter: blur(10px);
         }
-        
-        .welcome h1 {
-            font-size: 32px;
-            margin-bottom: 10px;
+        .data-table th {
+            background: rgba(59, 130, 246, 0.1);
+            border-bottom: 1px solid rgba(59, 130, 246, 0.2);
         }
-        
-        .welcome p {
-            color: #666;
-            font-size: 16px;
-        }
-        
-        .section {
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        }
-        
-        .section h2 {
-            margin-bottom: 20px;
-            font-size: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #f0f0f0;
-        }
-        
-        .btn {
-            background: #667eea;
-            color: white;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: background 0.3s;
-        }
-        
-        .btn:hover {
-            background: #5568d3;
-        }
-        
-        .btn-secondary {
-            background: #e0e0e0;
-            color: #333;
-        }
-        
-        .btn-secondary:hover {
-            background: #d0d0d0;
-        }
-        
-        .error {
-            background: #fee;
-            color: #c00;
-            padding: 12px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            border-left: 4px solid #c00;
-        }
-        
-        .success {
-            background: #efe;
-            color: #0c0;
-            padding: 12px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            border-left: 4px solid #0c0;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: #333;
-        }
-        
-        input, textarea {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-family: inherit;
-            font-size: 14px;
-        }
-        
-        input:focus, textarea:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .modal.active {
-            display: flex;
-        }
-        
-        .modal-content {
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .modal-header h3 {
-            font-size: 20px;
-        }
-        
-        .close {
-            font-size: 28px;
-            cursor: pointer;
-            color: #999;
-        }
-        
-        .close:hover {
-            color: #333;
-        }
-        
-        .apps-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-        
-        .app-card {
-            background: #f9f9f9;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 20px;
-            transition: all 0.3s;
-        }
-        
-        .app-card:hover {
-            border-color: #667eea;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
-        }
-        
-        .app-name {
-            font-size: 18px;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 8px;
-        }
-        
-        .app-slug {
-            color: #999;
-            font-size: 13px;
-            font-family: monospace;
-            margin-bottom: 12px;
-        }
-        
-        .app-description {
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 15px;
-            line-height: 1.5;
-        }
-        
-        .app-stats {
-            display: flex;
-            justify-content: space-between;
-            padding: 12px 0;
-            border-top: 1px solid #e0e0e0;
-            margin-top: 12px;
-        }
-        
-        .app-stat {
-            text-align: center;
-            font-size: 12px;
-        }
-        
-        .app-stat-number {
-            font-size: 20px;
-            font-weight: 700;
-            color: #667eea;
-        }
-        
-        .app-stat-label {
-            color: #999;
-        }
-        
-        .app-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-        
-        .app-actions a, .app-actions button {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 13px;
-            text-align: center;
-            text-decoration: none;
-            background: #667eea;
-            color: white;
-            transition: background 0.3s;
-        }
-        
-        .app-actions a:hover, .app-actions button:hover {
-            background: #5568d3;
-        }
-        
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: #999;
-        }
-        
-        .empty-state h3 {
-            margin-bottom: 10px;
-            color: #666;
+        .data-table td {
+            border-bottom: 1px solid rgba(59, 130, 246, 0.05);
         }
     </style>
 </head>
-<body>
-    <div class="header">
-        <div class="header-content">
-            <div class="logo">🔐 LicenseCore</div>
-            <div class="user-menu">
-                <div class="user-info">
-                    <div class="username"><?= sanitize($user['username']) ?></div>
-                    <div class="plan">Plan: <?= ucfirst(sanitize($user['plan'])) ?></div>
+<body class="bg-[#09090d] text-white">
+
+<!-- Main Container -->
+<div class="flex h-screen overflow-hidden">
+    <!-- Sidebar -->
+    <div class="w-64 bg-gradient-to-b from-[#1a1a2e] to-[#15152a] border-r border-[#2a2a4e] flex flex-col overflow-y-auto shadow-2xl">
+        <!-- Logo & Branding -->
+        <div class="p-6 border-b border-[#2a2a4e] bg-gradient-to-br from-[#1f1f3a] to-[#1a1a2e]">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 via-red-600 to-pink-600 flex items-center justify-center shadow-lg">
+                    <i class="fas fa-shield-alt text-white text-xl"></i>
                 </div>
-                <a href="logout.php" class="logout-btn">Logout</a>
+                <div>
+                    <h1 class="font-bold text-xl gradient-text">Admin Panel</h1>
+                    <p class="text-xs text-gray-400 font-medium">LicenseCore v2.0</p>
+                </div>
             </div>
         </div>
-    </div>
-    
-    <div class="container">
-        <div class="welcome">
-            <h1>Welcome, <?= sanitize($user['username']) ?>! 👋</h1>
-            <p>Manage your applications and licenses from your dashboard</p>
-        </div>
-        
-        <div class="section">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2 style="margin-bottom: 0; padding-bottom: 0; border-bottom: none;">Your Applications</h2>
-                <button class="btn" onclick="openModal('createAppModal')">+ Create App</button>
-            </div>
-            
-            <?php if ($create_error): ?>
-                <div class="error">✗ <?= sanitize($create_error) ?></div>
-            <?php endif; ?>
-            
-            <?php if ($create_success): ?>
-                <div class="success">✓ <?= sanitize($create_success) ?></div>
-            <?php endif; ?>
-            
-            <?php if (count($applications) > 0): ?>
-                <div class="apps-grid">
-                    <?php foreach ($applications as $app): ?>
-                    <div class="app-card">
-                        <div class="app-name"><?= sanitize($app['app_name']) ?></div>
-                        <div class="app-slug">@<?= sanitize($app['app_slug']) ?></div>
-                        <div class="app-description"><?= sanitize($app['description']) ?: 'No description' ?></div>
-                        <div class="app-stats">
-                            <div class="app-stat">
-                                <div class="app-stat-number"><?= $app['license_count'] ?></div>
-                                <div class="app-stat-label">Licenses</div>
-                            </div>
-                            <div class="app-stat">
-                                <div class="app-stat-number"><?= ucfirst($app['status']) ?></div>
-                                <div class="app-stat-label">Status</div>
-                            </div>
-                        </div>
-                        <div class="app-actions">
-                            <a href="app.php?id=<?= $app['id'] ?>">Manage</a>
-                            <button onclick="deleteApp(<?= $app['id'] ?>)">Delete</button>
-                        </div>
+
+        <!-- User Info -->
+        <div class="p-4 border-b border-[#2a2a4e]">
+            <div class="glass-effect rounded-xl p-4 shadow-lg hover-glow smooth-transition">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-12 h-12 rounded-full bg-gradient-to-br from-red-400 via-red-500 to-pink-500 flex items-center justify-center shadow-lg ring-2 ring-red-500/30">
+                        <i class="fas fa-user-shield text-white text-lg"></i>
                     </div>
-                    <?php endforeach; ?>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-bold text-sm truncate"><?= htmlspecialchars($user['username']) ?></p>
+                        <p class="text-xs text-gray-400 truncate">Administrator</p>
+                    </div>
                 </div>
-            <?php else: ?>
-                <div class="empty-state">
-                    <h3>No applications yet</h3>
-                    <p>Create your first application to get started with license management</p>
-                    <button class="btn" onclick="openModal('createAppModal')" style="margin-top: 20px;">Create Your First App</button>
+                <div class="bg-gradient-to-r from-[#1a1a2e] to-[#1f1f3a] rounded-lg px-3 py-2 border border-red-500/20">
+                    <p class="text-xs text-gray-300">Role: <span class="font-mono text-red-400 font-semibold">ADMIN</span></p>
                 </div>
-            <?php endif; ?>
-        </div>
-    </div>
-    
-    <!-- Create App Modal -->
-    <div id="createAppModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Create New Application</h3>
-                <span class="close" onclick="closeModal('createAppModal')">&times;</span>
             </div>
-            <form method="POST">
-                <input type="hidden" name="action" value="create_app">
-                <div class="form-group">
-                    <label for="app_name">Application Name*</label>
-                    <input 
-                        type="text" 
-                        id="app_name" 
-                        name="app_name" 
-                        placeholder="My Awesome App"
-                        required
-                    >
+        </div>
+
+        <!-- Main Navigation -->
+        <nav class="flex-1 px-4 py-6">
+            <!-- Main Section -->
+            <div class="mb-6">
+                <p class="text-xs font-bold text-gray-500 mb-3 px-3 tracking-wider">ADMIN PANEL</p>
+                <a href="?page=dashboard" class="sidebar-item flex items-center gap-3 px-4 py-2.5 rounded-lg mx-2 <?= $page === 'dashboard' ? 'sidebar-active' : 'hover:bg-[#262641]' ?>">
+                    <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                        <i class="fas fa-tachometer-alt text-blue-400 text-sm"></i>
+                    </div>
+                    <span class="font-medium">Dashboard</span>
+                </a>
+                <a href="?page=users" class="sidebar-item flex items-center gap-3 px-4 py-2.5 rounded-lg mx-2 <?= $page === 'users' ? 'sidebar-active' : 'hover:bg-[#262641]' ?>">
+                    <div class="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                        <i class="fas fa-users text-green-400 text-sm"></i>
+                    </div>
+                    <span class="font-medium">User Management</span>
+                </a>
+                <a href="?page=applications" class="sidebar-item flex items-center gap-3 px-4 py-2.5 rounded-lg mx-2 <?= $page === 'applications' ? 'sidebar-active' : 'hover:bg-[#262641]' ?>">
+                    <div class="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                        <i class="fas fa-cubes text-purple-400 text-sm"></i>
+                    </div>
+                    <span class="font-medium">Applications</span>
+                </a>
+                <a href="?page=licenses" class="sidebar-item flex items-center gap-3 px-4 py-2.5 rounded-lg mx-2 <?= $page === 'licenses' ? 'sidebar-active' : 'hover:bg-[#262641]' ?>">
+                    <div class="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center">
+                        <i class="fas fa-key text-yellow-400 text-sm"></i>
+                    </div>
+                    <span class="font-medium">License Keys</span>
+                </a>
+                <a href="?page=logs" class="sidebar-item flex items-center gap-3 px-4 py-2.5 rounded-lg mx-2 <?= $page === 'logs' ? 'sidebar-active' : 'hover:bg-[#262641]' ?>">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                        <i class="fas fa-history text-indigo-400 text-sm"></i>
+                    </div>
+                    <span class="font-medium">System Logs</span>
+                </a>
+            </div>
+        </nav>
+
+        <!-- Logout Button -->
+        <div class="p-4 border-t border-[#2a2a4e] bg-gradient-to-b from-transparent to-[#15152a]">
+            <a href="logout.php" class="sidebar-item flex items-center gap-3 px-4 py-2.5 rounded-lg mx-2 text-red-400 hover:bg-red-500/10 border border-red-500/20 hover:border-red-500/50 smooth-transition">
+                <div class="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
+                    <i class="fas fa-sign-out-alt text-red-400 text-sm"></i>
                 </div>
-                <div class="form-group">
-                    <label for="description">Description</label>
-                    <textarea 
-                        id="description" 
-                        name="description" 
-                        placeholder="Describe your application"
-                        rows="4"
-                    ></textarea>
-                </div>
-                <button type="submit" class="btn">Create Application</button>
-            </form>
+                <span class="font-semibold">Logout</span>
+            </a>
         </div>
     </div>
-    
-    <script>
-        function openModal(modalId) {
-            document.getElementById(modalId).classList.add('active');
-        }
-        
-        function closeModal(modalId) {
-            document.getElementById(modalId).classList.remove('active');
-        }
-        
-        function deleteApp(appId) {
-            if (confirm('Are you sure you want to delete this application? This cannot be undone.')) {
-                window.location.href = 'delete_app.php?id=' + appId;
-            }
-        }
-        
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = event.target;
-            if (modal.classList.contains('modal')) {
-                modal.classList.remove('active');
-            }
-        }
-    </script>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <!-- Top Header -->
+        <header class="bg-gradient-to-r from-[#1a1a2e] via-[#1f1f3a] to-[#1a1a2e] border-b border-[#2a2a4e] h-16 flex items-center px-8 justify-between shadow-lg">
+            <div>
+                <h2 class="text-xl font-bold capitalize bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                    <?php
+                    switch($page) {
+                        case 'dashboard': echo 'Admin Dashboard'; break;
+                        case 'users': echo 'User Management'; break;
+                        case 'applications': echo 'Application Management'; break;
+                        case 'licenses': echo 'License Management'; break;
+                        case 'logs': echo 'System Logs'; break;
+                        default: echo 'Admin Dashboard';
+                    }
+                    ?>
+                </h2>
+                <p class="text-xs text-gray-400 font-medium">Welcome back, <span class="text-red-400"><?= htmlspecialchars($user['username']) ?></span></p>
+            </div>
+            <div class="flex items-center gap-4">
+                <button class="relative p-2.5 hover:bg-[#262641] rounded-xl transition-all duration-300 hover:scale-110">
+                    <i class="fas fa-bell text-gray-300 text-lg"></i>
+                    <span class="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full notification-dot"></span>
+                </button>
+                <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-red-400 via-red-500 to-pink-500 flex items-center justify-center shadow-lg ring-2 ring-red-500/30 hover:ring-red-500/50 transition-all duration-300 cursor-pointer">
+                    <i class="fas fa-user-shield text-white text-base"></i>
+                </div>
+            </div>
+        </header>
+
+        <!-- Content Area -->
+        <main class="flex-1 overflow-y-auto">
+            <div class="p-8">
+            <?php
+                switch ($page) {
+                    case 'dashboard':
+                        include 'pages/dashboard.php';
+                        break;
+                    case 'users':
+                        include 'pages/users.php';
+                        break;
+                    case 'applications':
+                        include 'pages/applications.php';
+                        break;
+                    case 'licenses':
+                        include 'pages/licenses.php';
+                        break;
+                    case 'logs':
+                        include 'pages/logs.php';
+                        break;
+                    default:
+                        include 'pages/dashboard.php';
+                }
+            ?>
+            </div>
+        </main>
+    </div>
+</div>
+
 </body>
 </html>
